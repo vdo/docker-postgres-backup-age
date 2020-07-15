@@ -52,10 +52,16 @@ else
   echo "Missing POSTGRES_PASSWORD_FILE file."
   exit 1
 fi
+
+if [ "${AGE_KEY}" = "**None**" ]; then
+  echo "You need to set age encryption key using AGE_KEY environment variable."
+  exit 1
+fi
+
 POSTGRES_HOST_OPTS="-h ${POSTGRES_HOST} -p ${POSTGRES_PORT} ${POSTGRES_EXTRA_OPTS}"
 KEEP_DAYS=${BACKUP_KEEP_DAYS}
-KEEP_WEEKS=`expr $(((${BACKUP_KEEP_WEEKS} * 7) + 1))`
-KEEP_MONTHS=`expr $(((${BACKUP_KEEP_MONTHS} * 31) + 1))`
+KEEP_WEEKS=$(expr $(((${BACKUP_KEEP_WEEKS} * 7) + 1)))
+KEEP_MONTHS=$(expr $(((${BACKUP_KEEP_MONTHS} * 31) + 1)))
 
 #Initialize dirs
 mkdir -p "${BACKUP_DIR}/daily/" "${BACKUP_DIR}/weekly/" "${BACKUP_DIR}/monthly/"
@@ -63,15 +69,16 @@ mkdir -p "${BACKUP_DIR}/daily/" "${BACKUP_DIR}/weekly/" "${BACKUP_DIR}/monthly/"
 #Loop all databases
 for DB in ${POSTGRES_DBS}; do
   #Initialize filename vers
-  DFILE="${BACKUP_DIR}/daily/${DB}-`date +%Y%m%d-%H%M%S`.sql.gz"
-  WFILE="${BACKUP_DIR}/weekly/${DB}-`date +%G%V`.sql.gz"
-  MFILE="${BACKUP_DIR}/monthly/${DB}-`date +%Y%m`.sql.gz"
+  DFILE="${BACKUP_DIR}/daily/${DB}-$(date +%Y%m%d-%H%M%S).sql.gz"
+  WFILE="${BACKUP_DIR}/weekly/${DB}-$(date +%G%V).sql.gz"
+  MFILE="${BACKUP_DIR}/monthly/${DB}-$(date +%Y%m).sql.gz"
   #Create dump
-  echo "Creating dump of ${DB} database from ${POSTGRES_HOST}..."
-  pg_dump -f "${DFILE}" ${POSTGRES_HOST_OPTS} ${DB}
+  echo "Creating dump of ${DB} database from ${POSTGRES_HOST} with public key:"
+  echo $AGE_KEY
+  pg_dump ${POSTGRES_HOST_OPTS} ${DB} | rage -r "${AGE_KEY}" >"${DFILE}.age"
   #Copy (hardlink) for each entry
-  ln -vf "${DFILE}" "${WFILE}"
-  ln -vf "${DFILE}" "${MFILE}"
+  ln -vf "${DFILE}".age "${WFILE}".age
+  ln -vf "${DFILE}".age "${MFILE}".age
   #Clean old files
   echo "Cleaning older than ${KEEP_DAYS} days for ${DB} database from ${POSTGRES_HOST}..."
   find "${BACKUP_DIR}/daily" -maxdepth 1 -mtime +${KEEP_DAYS} -name "${DB}-*.sql*" -exec rm -rf '{}' ';'

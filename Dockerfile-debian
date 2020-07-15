@@ -2,11 +2,14 @@ ARG BASETAG=latest
 FROM postgres:$BASETAG
 
 ARG GOCRONVER=v0.0.9
+ARG RAGEVER=v0.4.0
 ARG TARGETOS
 ARG TARGETARCH
 RUN set -x \
 	&& apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/* \
 	&& curl -L https://github.com/prodrigestivill/go-cron/releases/download/$GOCRONVER/go-cron-$TARGETOS-$TARGETARCH.gz | zcat > /usr/local/bin/go-cron \
+  && if  [ "${TARGETARCH}" = "amd64" ]; then TARGETARCH=x86_64; fi \
+  && curl -L https://github.com/str4d/rage/releases/download/$RAGEVER/rage-$RAGEVER-$TARGETARCH-$TARGETOS.tar.gz | tar xvzf - -C  /usr/local/bin/ --strip-components=1 \
 	&& chmod a+x /usr/local/bin/go-cron \
 	&& apt-get purge -y --auto-remove ca-certificates && apt-get clean
 
@@ -19,6 +22,7 @@ ENV POSTGRES_DB="**None**" \
     POSTGRES_PASSWORD="**None**" \
     POSTGRES_PASSWORD_FILE="**None**" \
     POSTGRES_EXTRA_OPTS="-Z9" \
+    AGE_KEY="**None**" \
     SCHEDULE="@daily" \
     BACKUP_DIR="/backups" \
     BACKUP_KEEP_DAYS=7 \
